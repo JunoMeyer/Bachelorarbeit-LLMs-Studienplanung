@@ -1,647 +1,424 @@
+############################################################
+# Bachelorarbeit – Analyse der LLM-Outputs
+# Autorin: Juno Meyer
+# Datum: 10.08.2026
+#
+# Zweck des Skripts:
+# Dieses Skript liest die kodierten LLM-Outputs ein und berechnet
+# deskriptive Statistiken sowie absolute und relative Häufigkeiten
+# für die im Ergebnisteil berichteten Tabellen.
+#
+# Hinweise zur Reproduzierbarkeit:
+# - Das Skript verwendet relative Pfade.
+# - Es sollten keine personenbezogenen lokalen Pfade verwendet werden.
+# - Paketversionen werden am Ende über sessionInfo() dokumentiert.
+# - Rohdaten sollten im Ordner "data/" liegen.
+# - Ergebnisse werden im Ordner "results/" gespeichert.
+############################################################
+
 
 ############################################################
-# 0. Arbeitsverzeichnis setzen
+# 0. Vorbereitung
 ############################################################
 
-setwd("C:/Users/User/OneDrive - Universität Münster/Uni/Bachelorarbeit/Code")
+# Hinweis:
+# Für Open-Science-Zwecke sollte dieses Skript idealerweise in einem
+# RStudio-Projekt ausgeführt werden. Der Projektordner sollte z.B.
+# folgende Struktur haben:
+#
+# projektordner/
+# ├── analysis.R
+# ├── data/
+# │   └── Condition_Matrix_with_LLM_Output_31.xlsx
+# └── results/
+#
+# Es wird bewusst kein setwd() verwendet, da absolute lokale Pfade
+# die Reproduzierbarkeit für andere Personen erschweren.
+
+# Ergebnisordner erstellen, falls er noch nicht existiert
+if (!dir.exists("results")) {
+  dir.create("results")
+}
+
 
 ############################################################
-# 1. Pakete installieren und laden
+# 1. Pakete laden
 ############################################################
 
-# install.packages("readxl", type = "binary")
+# Pakete sollten vorab installiert sein.
+# Für vollständige Reproduzierbarkeit kann zusätzlich renv genutzt werden:
+# renv::init()
+# renv::snapshot()
+
 library(readxl)
-# install.packages("dplyr")
 library(dplyr)
-# install.packages("tidyr")
 library(tidyr)
-# install.packages("tibble")
 library(tibble)
-# install.packages("psych")
-library(psych)
 
 
 ############################################################
 # 2. Daten einlesen
 ############################################################
 
-d <- read_excel(
-  "C:/Users/User/OneDrive - Universität Münster/Uni/Bachelorarbeit/Code/Condition_Matrix_with_LLM_Output_31 - Kopie.xlsx"
+# Relativer Pfad zur Datendatei.
+# Bitte sicherstellen, dass die Datei im Ordner "data/" liegt.
+data_path <- file.path(
+  "data",
+  "Condition_Matrix_with_LLM_Output_31 - Kopie.xlsx"
 )
 
-# Datenstruktur prüfen
-str(d)
+# Daten einlesen
+d_raw <- read_excel(data_path)
 
+# Erste Prüfung der Datenstruktur
+str(d_raw)
 
 
 ############################################################
-# Tabelle: Häufigkeiten der Kodierungen nach
+# 3. Definitionen und Metadaten
+############################################################
+
+# In diesem Abschnitt werden zentrale Informationen einmalig definiert.
+# Dadurch wird vermieden, dass Variablennamen im Skript mehrfach
+# manuell wiederholt werden müssen.
+
+# Zuordnung der Rating-Variablen zu:
+# - Studienplanungsaspekt
+# - Bewertungsdimension
+rating_info <- tribble(
+  ~rating_variable,              ~Aspekt,              ~Bewertungsdimension,
+  "Studiendesign_rating",        "Studiendesign",      "Angemessenheit",
+  "Krit_Studiendesign_rating",   "Studiendesign",      "Entscheidungshilfe",
+  "Messinstrumente_rating",      "Messinstrumente",    "Angemessenheit",
+  "Krit_Messinstr_rating",       "Messinstrumente",    "Entscheidungshilfe",
+  "Kontrollvariablen_rating",    "Kontrollvariablen",  "Angemessenheit",
+  "Krit_Kontrollvar_rating",     "Kontrollvariablen",  "Entscheidungshilfe"
+)
+
+# Rating-Spalten aus rating_info ableiten
+rating_cols <- rating_info$rating_variable
+
+# Erwartete Kodierungswerte
+# Annahme: 1 = niedrigste Ausprägung, 3 = höchste Ausprägung
+rating_levels <- c(1, 2, 3)
+
+# Reihenfolge der Studienplanungsaspekte
+aspekt_levels <- c(
+  "Studiendesign",
+  "Messinstrumente",
+  "Kontrollvariablen"
+)
+
+# Reihenfolge der Bewertungsdimensionen
+dimension_levels <- c(
+  "Angemessenheit",
+  "Entscheidungshilfe"
+)
+
+# Reihenfolge der Promptbedingungen
+prompt_levels <- c(
+  "Reflexionsanweisung",
+  "Hypothesen"
+)
+
+# Reihenfolge der Bedingungsausprägungen
+# yes = Bedingung vorhanden
+# no  = Bedingung nicht vorhanden
+condition_levels <- c("yes", "no")
+
+
+############################################################
+# 4. Hilfsfunktionen
+############################################################
+
+# Funktion zur Vereinheitlichung von yes/no-Kodierungen.
+# Dadurch wäre das Skript auch robust, falls Werte als "ja", "nein",
+# "1", "0", "true" oder "false" vorliegen.
+normalise_condition <- function(x) {
+  x <- tolower(trimws(as.character(x)))
+  
+  case_when(
+    x %in% c("yes", "ja", "1", "true") ~ "yes",
+    x %in% c("no", "nein", "0", "false") ~ "no",
+    TRUE ~ x
+  )
+}
+
+# Funktion zur Berechnung von Zeilenmittelwerten.
+# Falls eine Zeile ausschließlich fehlende Werte enthält, wird NA gesetzt.
+safe_row_mean <- function(data, cols) {
+  x <- rowMeans(data[, cols, drop = FALSE], na.rm = TRUE)
+  x[is.nan(x)] <- NA_real_
+  x
+}
+
+# Funktion zur Formatierung von Häufigkeiten:
+# Beispiel: 12 (60.0%)
+format_n_percent <- function(n, total) {
+  percent <- ifelse(total > 0, n / total * 100, NA_real_)
+  sprintf("%d (%.1f%%)", n, percent)
+}
+
+
+############################################################
+# 5. Daten vorbereiten und prüfen
+############################################################
+
+# Prüfen, ob alle benötigten Spalten vorhanden sind
+required_cols <- c("type", "hypo", rating_cols)
+
+missing_cols <- setdiff(required_cols, names(d_raw))
+
+if (length(missing_cols) > 0) {
+  stop(
+    "Folgende benötigte Spalten fehlen im Datensatz: ",
+    paste(missing_cols, collapse = ", ")
+  )
+}
+
+# Arbeitsdatensatz erstellen:
+# - Promptbedingungen vereinheitlichen
+# - Rating-Spalten numerisch kodieren
+d <- d_raw %>%
+  mutate(
+    type = normalise_condition(type),
+    hypo = normalise_condition(hypo),
+    across(all_of(rating_cols), ~ suppressWarnings(as.numeric(.x)))
+  )
+
+# Prüfen, ob unerwartete Rating-Werte vorhanden sind
+observed_ratings <- sort(unique(na.omit(unlist(d[rating_cols]))))
+unexpected_ratings <- setdiff(observed_ratings, rating_levels)
+
+if (length(unexpected_ratings) > 0) {
+  warning(
+    "Es wurden unerwartete Rating-Werte gefunden: ",
+    paste(unexpected_ratings, collapse = ", ")
+  )
+}
+
+
+############################################################
+# 6. Long-Format der Einzelbewertungen erstellen
+############################################################
+
+# Für viele Auswertungen ist das Long-Format sinnvoller:
+# Jede Zeile entspricht dann einer einzelnen Bewertung eines Outputs.
+d_ratings_long <- d %>%
+  mutate(Output_ID = row_number()) %>%
+  select(Output_ID, type, hypo, all_of(rating_cols)) %>%
+  pivot_longer(
+    cols = all_of(rating_cols),
+    names_to = "rating_variable",
+    values_to = "Rating"
+  ) %>%
+  left_join(rating_info, by = "rating_variable") %>%
+  mutate(
+    Aspekt = factor(Aspekt, levels = aspekt_levels),
+    Bewertungsdimension = factor(
+      Bewertungsdimension,
+      levels = dimension_levels
+    )
+  ) %>%
+  filter(!is.na(Rating))
+
+
+############################################################
+# 7. Tabelle: Häufigkeiten der Kodierungen nach
 # Studienplanungsaspekt und Bewertungsdimension
 ############################################################
 
-# Zuordnung der Variablen zu Aspekt und Bewertungsdimension
-var_info <- tribble(
-  ~Variable,                     ~Aspekt,              ~Dimension,
-  "Studiendesign_rating",         "Studiendesign",      "Angemessenheit",
-  "Krit_Studiendesign_rating",    "Studiendesign",      "Entscheidungshilfe",
-  "Messinstrumente_rating",       "Messinstrumente",    "Angemessenheit",
-  "Krit_Messinstr_rating",        "Messinstrumente",    "Entscheidungshilfe",
-  "Kontrollvariablen_rating",     "Kontrollvariablen",  "Angemessenheit",
-  "Krit_Kontrollvar_rating",      "Kontrollvariablen",  "Entscheidungshilfe"
-)
+# Diese Tabelle zeigt, wie oft die Kodierungen 1, 2 und 3 je
+# Studienplanungsaspekt und Bewertungsdimension vergeben wurden.
 
-# alle vorhandenen Rating-Ausprägungen bestimmen
-rating_levels <- d %>%
-  select(all_of(var_info$Variable)) %>%
-  pivot_longer(everything(), values_to = "Rating") %>%
-  filter(!is.na(Rating)) %>%
-  mutate(Rating = as.character(Rating)) %>%
-  distinct(Rating) %>%
-  arrange(Rating) %>%
-  pull(Rating)
-
-# Tabelle im Wide-Format
-tab_wide <- d %>%
-  select(all_of(var_info$Variable)) %>%
-  pivot_longer(
-    cols = everything(),
-    names_to = "Variable",
-    values_to = "Rating"
+tab_kodierungen_dimension <- d_ratings_long %>%
+  count(
+    Aspekt,
+    Bewertungsdimension,
+    Rating,
+    name = "n"
   ) %>%
-  left_join(var_info, by = "Variable") %>%
-  filter(!is.na(Rating)) %>%
-  mutate(
-    Rating = as.character(Rating),
-    Aspekt = factor(
-      Aspekt,
-      levels = c("Studiendesign", "Messinstrumente", "Kontrollvariablen")
-    ),
-    Dimension = factor(
-      Dimension,
-      levels = c("Angemessenheit", "Entscheidungshilfe")
-    )
+  group_by(Aspekt, Bewertungsdimension) %>%
+  complete(
+    Rating = rating_levels,
+    fill = list(n = 0)
   ) %>%
-  count(Aspekt, Dimension, Rating, name = "n") %>%
-  group_by(Aspekt, Dimension) %>%
-  complete(Rating = rating_levels, fill = list(n = 0)) %>%
   mutate(
     N = sum(n),
-    rel = n / N,
-    Wert = sprintf("%d (%.1f%%)", n, rel * 100)
+    Wert = format_n_percent(n, N)
   ) %>%
   ungroup() %>%
-  select(Aspekt, Dimension, N, Rating, Wert) %>%
+  mutate(
+    Rating = paste0("Rating_", Rating)
+  ) %>%
+  select(
+    Aspekt,
+    Bewertungsdimension,
+    N,
+    Rating,
+    Wert
+  ) %>%
   pivot_wider(
     names_from = Rating,
-    values_from = Wert,
-    names_prefix = "Rating_"
+    values_from = Wert
   ) %>%
-  arrange(Aspekt, Dimension)
+  arrange(
+    Aspekt,
+    Bewertungsdimension
+  )
 
-tab_wide # Abgleich mit Tabelle 7 (Übersicht der Verteilung der Kodierungen pro Bewertungsdimensionen)
+tab_kodierungen_dimension
 
 
 ############################################################
-# Daten aggregieren Frage 1
+# 8. Forschungsfrage 1:
+# Deskriptive Kennwerte der Studienplanungsaspekte
 ############################################################
 
-# Teildatensatz erstellen 
+# Für jeden Output wird pro Studienplanungsaspekt ein Mittelwert aus den
+# beiden zugehörigen Bewertungsdimensionen gebildet:
+#
+# Studiendesign:
+#   - Studiendesign_rating
+#   - Krit_Studiendesign_rating
+#
+# Messinstrumente:
+#   - Messinstrumente_rating
+#   - Krit_Messinstr_rating
+#
+# Kontrollvariablen:
+#   - Kontrollvariablen_rating
+#   - Krit_Kontrollvar_rating
 
-Studiendesign_Gesamt <- rowMeans(
-  d[, c("Krit_Studiendesign_rating", "Studiendesign_rating")],
-  na.rm = TRUE
-)
-
-Studiendesign_Gesamt
-
-
-Messinstrumente_Gesamt <- rowMeans(
-  d[, c("Krit_Messinstr_rating", "Messinstrumente_rating")],
-  na.rm = TRUE
-)
-
-Messinstrumente_Gesamt
-
-Kontrollvariablen_Gesamt <- rowMeans(
-  d[, c("Krit_Kontrollvar_rating", "Kontrollvariablen_rating")],
-  na.rm = TRUE
-)
-
-Kontrollvariablen_Gesamt
-
-
-# Deskriptive Statistiken berechnen 
-deskriptiv <- function(x) {
-  c(
-    Mittelwert = mean(x, na.rm = TRUE),
-    Median = median(x, na.rm = TRUE),
-    Standardabweichung = sd(x, na.rm = TRUE),
-    Minimum = min(x, na.rm = TRUE),
-    Maximum = max(x, na.rm = TRUE),
-    N = sum(!is.na(x))
-  )
-}
-
-Deskriptiv_Gesamt <- rbind(
-  Studiendesign = deskriptiv(Studiendesign_Gesamt),
-  Messinstrumente = deskriptiv(Messinstrumente_Gesamt),
-  Kontrollvariablen = deskriptiv(Kontrollvariablen_Gesamt)
-)
-
-Deskriptiv_Gesamt <- as.data.frame(Deskriptiv_Gesamt)
-
-Deskriptiv_Gesamt # Abgleich mit Tabelle 4
-
-
-#########################################################################
-# Absolute und relative Häufigkeiten Frage 1: Darstellung in Wide-Tabelle
-#########################################################################
-
-# eine Wide-Tabelle erstellen zum Vergleich der Häufigkeiten zwischen den Aspekten 
-
-# Aspekte und zugehörige Variablen definieren
-aspekte <- list(
-  Studiendesign = c("Krit_Studiendesign_rating", "Studiendesign_rating"),
-  Messinstrumente = c("Krit_Messinstr_rating", "Messinstrumente_rating"),
-  Kontrollvariablen = c("Krit_Kontrollvar_rating", "Kontrollvariablen_rating")
-)
-
-# Alle vorkommenden Rating-Werte bestimmen
-alle_werte <- sort(unique(na.omit(unlist(d[unlist(aspekte)], use.names = FALSE))))
-
-# Wide-Tabelle erstellen
-Haeufigkeiten_Aspekte_Wide <- do.call(rbind, lapply(names(aspekte), function(aspekt) {
-  
-  x <- unlist(d[aspekte[[aspekt]]], use.names = FALSE)
-  x <- x[!is.na(x)]
-  
-  abs_h <- table(factor(x, levels = alle_werte))
-  proz <- prop.table(abs_h) * 100
-  
-  werte_formatiert <- sprintf(
-    "%d (%.1f%%)",
-    as.numeric(abs_h),
-    as.numeric(proz)
-  )
-  
-  names(werte_formatiert) <- paste0("Wert_", alle_werte)
-  
-  data.frame(
-    Aspekt = aspekt,
-    t(werte_formatiert),
-    check.names = FALSE
-  )
-}))
-
-rownames(Haeufigkeiten_Aspekte_Wide) <- NULL
-
-Haeufigkeiten_Aspekte_Wide # Abgleich Tabelle 7 
-
-
-############################################################
-# Daten aggregieren Frage 2a
-############################################################
-
-# Gesamtqualität abhängig von Reflexionsanweisung
-
-# Teildatensatz im Longformat erstellen 
-# ausprobieren nur n = 20 pro Gruppe 
-Refl_Gesamt <- data.frame(
-  type = d$type,
-  rating = rowMeans(d[ , c("Krit_Studiendesign_rating", "Studiendesign_rating", "Krit_Messinstr_rating", "Messinstrumente_rating", "Krit_Kontrollvar_rating", "Kontrollvariablen_rating")])
-)
-
-
-# alle deskriptiven Kennwerte gleichzeitig berechnen
-Deskriptiv_Refl_Gesamt <- aggregate(
-  rating ~ type,
-  data = Refl_Gesamt,
-  FUN = function(x) c(
-    mean = mean(x, na.rm = TRUE),
-    sd = sd(x, na.rm = TRUE),
-    median = median(x, na.rm = TRUE),
-    min = min(x, na.rm = TRUE),
-    max = max(x, na.rm = TRUE), 
-    N = sum(!is.na(x))
+aspect_cols <- list(
+  Studiendesign = c(
+    "Krit_Studiendesign_rating",
+    "Studiendesign_rating"
+  ),
+  Messinstrumente = c(
+    "Krit_Messinstr_rating",
+    "Messinstrumente_rating"
+  ),
+  Kontrollvariablen = c(
+    "Krit_Kontrollvar_rating",
+    "Kontrollvariablen_rating"
   )
 )
 
-Deskriptiv_Refl_Gesamt <- do.call(data.frame, Deskriptiv_Refl_Gesamt)
+# Datensatz mit aggregierten Aspekt-Scores erstellen
+d_scores <- d %>%
+  mutate(Output_ID = row_number())
 
-names(Deskriptiv_Refl_Gesamt) <- c(
-  "type", "mean", "sd", "median", "min", "max"
+d_scores$Studiendesign <- safe_row_mean(
+  d_scores,
+  aspect_cols$Studiendesign
 )
 
-Deskriptiv_Refl_Gesamt # Abgleich Tabelle 1 (oberer Teil)
-
-# Gesamtqualität abhängig von Hypothesen
-
-# Teildatensatz im Longformat erstellen
-# für n = 20 pro Gruppe
-Hypo_Gesamt <- data.frame(
-  type = d$hypo,
-  rating = rowMeans(d[ , c("Krit_Studiendesign_rating", "Studiendesign_rating", "Krit_Messinstr_rating", "Messinstrumente_rating", "Krit_Kontrollvar_rating", "Kontrollvariablen_rating")])
+d_scores$Messinstrumente <- safe_row_mean(
+  d_scores,
+  aspect_cols$Messinstrumente
 )
 
-
-# alle deskriptiven Kennwerte gleichzeitig berechnen
-Deskriptiv_Hypo_Gesamt <- aggregate(
-  rating ~ type,
-  data = Hypo_Gesamt,
-  FUN = function(x) c(
-    mean = mean(x, na.rm = TRUE),
-    sd = sd(x, na.rm = TRUE),
-    median = median(x, na.rm = TRUE),
-    min = min(x, na.rm = TRUE),
-    max = max(x, na.rm = TRUE),
-    N = sum(!is.na(x))
-  )
+d_scores$Kontrollvariablen <- safe_row_mean(
+  d_scores,
+  aspect_cols$Kontrollvariablen
 )
 
-Deskriptiv_Hypo_Gesamt <- do.call(data.frame, Deskriptiv_Hypo_Gesamt)
-
-names(Deskriptiv_Hypo_Gesamt) <- c(
-  "type", "mean", "sd", "median", "min", "max"
+# Gesamtqualität über alle sechs Rating-Variablen
+d_scores$Gesamtqualitaet <- safe_row_mean(
+  d_scores,
+  rating_cols
 )
 
-Deskriptiv_Hypo_Gesamt  # Abgleich Tabelle 1 (unterer Teil)
-
-# Häufigkeiten der Einzelbewertungen berechnen zur Beantwortung von Frage 2a: summiert über alle Bewertungsdimensionen 
-
-# Sechs Bewertungsdimensionen definieren
-rating_spalten <- c(
-  "Krit_Studiendesign_rating",
-  "Studiendesign_rating",
-  "Krit_Messinstr_rating",
-  "Messinstrumente_rating",
-  "Krit_Kontrollvar_rating",
-  "Kontrollvariablen_rating"
-)
-
-# Funktion für Häufigkeitstabelle im Wide-Format
-haeufigkeiten_wide <- function(data, gruppenvariable, rating_spalten, werte = c(1, 2, 3)) {
-  
-  gruppen <- unique(data[[gruppenvariable]][!is.na(data[[gruppenvariable]])])
-  
-  tab <- do.call(rbind, lapply(gruppen, function(gruppe) {
-    
-    # Zeilen der jeweiligen Gruppe auswählen
-    zeilen <- !is.na(data[[gruppenvariable]]) & data[[gruppenvariable]] == gruppe
-    
-    # Alle sechs Bewertungsdimensionen der Gruppe zusammenführen
-    x <- unlist(data[zeilen, rating_spalten], use.names = FALSE)
-    
-    # Fehlende Werte entfernen
-    x <- x[!is.na(x)]
-    
-    # Absolute Häufigkeiten für Kodierungen 1, 2, 3
-    abs_h <- table(factor(x, levels = werte))
-    
-    # Prozentwerte innerhalb der Gruppe
-    proz <- prop.table(abs_h) * 100
-    
-    # Darstellung: absolute Häufigkeit und Prozent in Klammern
-    werte_formatiert <- sprintf(
-      "%d (%.1f%%)",
-      as.numeric(abs_h),
-      as.numeric(proz)
-    )
-    
-    names(werte_formatiert) <- paste0("Kodierung_", werte)
-    
-    data.frame(
-      Gruppe = gruppe,
-      N_Einzelbewertungen = length(x),
-      t(werte_formatiert),
-      check.names = FALSE
-    )
-  }))
-  
-  rownames(tab) <- NULL
-  return(tab)
-}
-
-# Wide-Tabelle Häufigkeiten je nach Gruppe Reflexionsanweisung
-Haeufigkeiten_Refl_Wide <- haeufigkeiten_wide(
-  data = d,
-  gruppenvariable = "type",
-  rating_spalten = rating_spalten
-)
-
-Haeufigkeiten_Refl_Wide # Abgleich Tabelle 2 (oberer Teil)
-
-# Wide-Tabelle Häufigkeiten je nach Gruppe Hypothesen
-Haeufigkeiten_Hypo_Wide <- haeufigkeiten_wide(
-  data = d,
-  gruppenvariable = "hypo",
-  rating_spalten = rating_spalten
-)
-
-Haeufigkeiten_Hypo_Wide # Abgleich Tabelle 2 (unterer Teil)
-
-
-#################################################################
-# Daten aggregieren für deskriptive Kennwerte (Frage 2b)  #######
-#################################################################
-unique(d$type)
-unique(d$hypo)
-
-ohne_refl <- "no"
-mit_refl  <- "yes"
-
-ohne_hypo <- "no"
-mit_hypo  <- "yes"
-
-# Aspekt Studiendesign abhängig von Reflexionsanweisung
-
-Refl_Studiendesign <- data.frame(
-  type = d$type,
-  rating = rowMeans(
-    d[, c("Krit_Studiendesign_rating", "Studiendesign_rating")],
-    na.rm = TRUE
-  )
-)
-
-Refl_Studiendesign$rating[is.nan(Refl_Studiendesign$rating)] <- NA
-
-Deskriptiv_Refl_Studiendesign <- aggregate(
-  rating ~ type,
-  data = Refl_Studiendesign,
-  FUN = function(x) c(
-    mean = mean(x, na.rm = TRUE),
-    sd = sd(x, na.rm = TRUE),
-    median = median(x, na.rm = TRUE),
-    min = min(x, na.rm = TRUE),
-    max = max(x, na.rm = TRUE),
-    N = sum(!is.na(x))
-  )
-)
-
-Deskriptiv_Refl_Studiendesign <- do.call(data.frame, Deskriptiv_Refl_Studiendesign)
-
-names(Deskriptiv_Refl_Studiendesign) <- c(
-  "type", "mean", "sd", "median", "min", "max", "N"
-)
-
-MW_Diff_Refl_Studiendesign <- 
-  Deskriptiv_Refl_Studiendesign$mean[Deskriptiv_Refl_Studiendesign$type == mit_refl] -
-  Deskriptiv_Refl_Studiendesign$mean[Deskriptiv_Refl_Studiendesign$type == ohne_refl]
-
-Deskriptiv_Refl_Studiendesign$MW_Diff_mit_minus_ohne <- MW_Diff_Refl_Studiendesign
-
-Deskriptiv_Refl_Studiendesign
-
-# Aspekt Studiendesign abhängig von Hypothesenbedingung
-
-Hypo_Studiendesign <- data.frame(
-  hypo = d$hypo,
-  rating = rowMeans(
-    d[, c("Krit_Studiendesign_rating", "Studiendesign_rating")],
-    na.rm = TRUE
-  )
-)
-
-Hypo_Studiendesign$rating[is.nan(Hypo_Studiendesign$rating)] <- NA
-
-Deskriptiv_Hypo_Studiendesign <- aggregate(
-  rating ~ hypo,
-  data = Hypo_Studiendesign,
-  FUN = function(x) c(
-    mean = mean(x, na.rm = TRUE),
-    sd = sd(x, na.rm = TRUE),
-    median = median(x, na.rm = TRUE),
-    min = min(x, na.rm = TRUE),
-    max = max(x, na.rm = TRUE),
-    N = sum(!is.na(x))
-  )
-)
-
-Deskriptiv_Hypo_Studiendesign <- do.call(data.frame, Deskriptiv_Hypo_Studiendesign)
-
-names(Deskriptiv_Hypo_Studiendesign) <- c(
-  "hypo", "mean", "sd", "median", "min", "max", "N"
-)
-
-MW_Diff_Hypo_Studiendesign <- 
-  Deskriptiv_Hypo_Studiendesign$mean[Deskriptiv_Hypo_Studiendesign$hypo == mit_hypo] -
-  Deskriptiv_Hypo_Studiendesign$mean[Deskriptiv_Hypo_Studiendesign$hypo == ohne_hypo]
-
-Deskriptiv_Hypo_Studiendesign$MW_Diff_mit_minus_ohne <- MW_Diff_Hypo_Studiendesign
-
-Deskriptiv_Hypo_Studiendesign
-
-# Aspekt Messinstrumente abhängig von Reflexionsanweisung
-
-Refl_Messinstrumente <- data.frame(
-  type = d$type,
-  rating = rowMeans(
-    d[, c("Krit_Messinstr_rating", "Messinstrumente_rating")],
-    na.rm = TRUE
-  )
-)
-
-Refl_Messinstrumente$rating[is.nan(Refl_Messinstrumente$rating)] <- NA
-
-Deskriptiv_Refl_Messinstrumente <- aggregate(
-  rating ~ type,
-  data = Refl_Messinstrumente,
-  FUN = function(x) c(
-    mean = mean(x, na.rm = TRUE),
-    sd = sd(x, na.rm = TRUE),
-    median = median(x, na.rm = TRUE),
-    min = min(x, na.rm = TRUE),
-    max = max(x, na.rm = TRUE),
-    N = sum(!is.na(x))
-  )
-)
-
-Deskriptiv_Refl_Messinstrumente <- do.call(data.frame, Deskriptiv_Refl_Messinstrumente)
-
-names(Deskriptiv_Refl_Messinstrumente) <- c(
-  "type", "mean", "sd", "median", "min", "max", "N"
-)
-
-MW_Diff_Refl_Messinstrumente <- 
-  Deskriptiv_Refl_Messinstrumente$mean[Deskriptiv_Refl_Messinstrumente$type == mit_refl] -
-  Deskriptiv_Refl_Messinstrumente$mean[Deskriptiv_Refl_Messinstrumente$type == ohne_refl]
-
-Deskriptiv_Refl_Messinstrumente$MW_Diff_mit_minus_ohne <- MW_Diff_Refl_Messinstrumente
-
-Deskriptiv_Refl_Messinstrumente
-
-# Aspekt Messinstrumente abhängig von Hypothesenbedingung
-
-Hypo_Messinstrumente <- data.frame(
-  hypo = d$hypo,
-  rating = rowMeans(
-    d[, c("Krit_Messinstr_rating", "Messinstrumente_rating")],
-    na.rm = TRUE
-  )
-)
-
-Hypo_Messinstrumente$rating[is.nan(Hypo_Messinstrumente$rating)] <- NA
-
-Deskriptiv_Hypo_Messinstrumente <- aggregate(
-  rating ~ hypo,
-  data = Hypo_Messinstrumente,
-  FUN = function(x) c(
-    mean = mean(x, na.rm = TRUE),
-    sd = sd(x, na.rm = TRUE),
-    median = median(x, na.rm = TRUE),
-    min = min(x, na.rm = TRUE),
-    max = max(x, na.rm = TRUE),
-    N = sum(!is.na(x))
-  )
-)
-
-Deskriptiv_Hypo_Messinstrumente <- do.call(data.frame, Deskriptiv_Hypo_Messinstrumente)
-
-names(Deskriptiv_Hypo_Messinstrumente) <- c(
-  "hypo", "mean", "sd", "median", "min", "max", "N"
-)
-
-MW_Diff_Hypo_Messinstrumente <- 
-  Deskriptiv_Hypo_Messinstrumente$mean[Deskriptiv_Hypo_Messinstrumente$hypo == mit_hypo] -
-  Deskriptiv_Hypo_Messinstrumente$mean[Deskriptiv_Hypo_Messinstrumente$hypo == ohne_hypo]
-
-Deskriptiv_Hypo_Messinstrumente$MW_Diff_mit_minus_ohne <- MW_Diff_Hypo_Messinstrumente
-
-Deskriptiv_Hypo_Messinstrumente
-
-# Aspekt Kontrollvariablen abhängig von Reflexionsanweisung
-
-Refl_Kontrollvariablen <- data.frame(
-  type = d$type,
-  rating = rowMeans(
-    d[, c("Krit_Kontrollvar_rating", "Kontrollvariablen_rating")],
-    na.rm = TRUE
-  )
-)
-
-Refl_Kontrollvariablen$rating[is.nan(Refl_Kontrollvariablen$rating)] <- NA
-
-Deskriptiv_Refl_Kontrollvar <- aggregate(
-  rating ~ type,
-  data = Refl_Kontrollvariablen,
-  FUN = function(x) c(
-    mean = mean(x, na.rm = TRUE),
-    sd = sd(x, na.rm = TRUE),
-    median = median(x, na.rm = TRUE),
-    min = min(x, na.rm = TRUE),
-    max = max(x, na.rm = TRUE),
-    N = sum(!is.na(x))
-  )
-)
-
-Deskriptiv_Refl_Kontrollvar <- do.call(data.frame, Deskriptiv_Refl_Kontrollvar)
-
-names(Deskriptiv_Refl_Kontrollvar) <- c(
-  "type", "mean", "sd", "median", "min", "max", "N"
-)
-
-MW_Diff_Refl_Kontrollvar <- 
-  Deskriptiv_Refl_Kontrollvar$mean[Deskriptiv_Refl_Kontrollvar$type == mit_refl] -
-  Deskriptiv_Refl_Kontrollvar$mean[Deskriptiv_Refl_Kontrollvar$type == ohne_refl]
-
-Deskriptiv_Refl_Kontrollvar$MW_Diff_mit_minus_ohne <- MW_Diff_Refl_Kontrollvar
-
-Deskriptiv_Refl_Kontrollvar
-
-# Aspekt Kontrollvariablen abhängig von Hypothesenbedingung
-
-Hypo_Kontrollvariablen <- data.frame(
-  hypo = d$hypo,
-  rating = rowMeans(
-    d[, c("Krit_Kontrollvar_rating", "Kontrollvariablen_rating")],
-    na.rm = TRUE
-  )
-)
-
-Hypo_Kontrollvariablen$rating[is.nan(Hypo_Kontrollvariablen$rating)] <- NA
-
-Deskriptiv_Hypo_Kontrollvar <- aggregate(
-  rating ~ hypo,
-  data = Hypo_Kontrollvariablen,
-  FUN = function(x) c(
-    mean = mean(x, na.rm = TRUE),
-    sd = sd(x, na.rm = TRUE),
-    median = median(x, na.rm = TRUE),
-    min = min(x, na.rm = TRUE),
-    max = max(x, na.rm = TRUE),
-    N = sum(!is.na(x))
-  )
-)
-
-Deskriptiv_Hypo_Kontrollvar <- do.call(data.frame, Deskriptiv_Hypo_Kontrollvar)
-
-names(Deskriptiv_Hypo_Kontrollvar) <- c(
-  "hypo", "mean", "sd", "median", "min", "max", "N"
-)
-
-MW_Diff_Hypo_Kontrollvar <- 
-  Deskriptiv_Hypo_Kontrollvar$mean[Deskriptiv_Hypo_Kontrollvar$hypo == mit_hypo] -
-  Deskriptiv_Hypo_Kontrollvar$mean[Deskriptiv_Hypo_Kontrollvar$hypo == ohne_hypo]
-
-Deskriptiv_Hypo_Kontrollvar$MW_Diff_mit_minus_ohne <- MW_Diff_Hypo_Kontrollvar
-
-Deskriptiv_Hypo_Kontrollvar
-
-
-
-############################################################
-# Absolute und relative Häufigkeiten der Einzelbewertungen
-# getrennt nach Aspekt und Promptbedingung (Frage 2b)
-############################################################
-
-############################################################
-# 1. Rating-Spalten definieren
-############################################################
-
-rating_spalten <- c(
-  "Krit_Studiendesign_rating",
-  "Studiendesign_rating",
-  "Krit_Messinstr_rating",
-  "Messinstrumente_rating",
-  "Krit_Kontrollvar_rating",
-  "Kontrollvariablen_rating"
-)
-
-############################################################
-# 2. Daten ins Long-Format bringen
-############################################################
-
-d_long <- d %>%
+# Deskriptive Kennwerte pro Studienplanungsaspekt
+Deskriptiv_Gesamt <- d_scores %>%
+  select(
+    Output_ID,
+    all_of(names(aspect_cols))
+  ) %>%
   pivot_longer(
-    cols = all_of(rating_spalten),
-    names_to = "rating_variable",
-    values_to = "rating"
+    cols = all_of(names(aspect_cols)),
+    names_to = "Aspekt",
+    values_to = "Score"
   ) %>%
   mutate(
-    Aspekt = case_when(
-      rating_variable %in% c(
-        "Krit_Studiendesign_rating",
-        "Studiendesign_rating"
-      ) ~ "Studiendesign",
-      
-      rating_variable %in% c(
-        "Krit_Messinstr_rating",
-        "Messinstrumente_rating"
-      ) ~ "Messinstrumente",
-      
-      rating_variable %in% c(
-        "Krit_Kontrollvar_rating",
-        "Kontrollvariablen_rating"
-      ) ~ "Kontrollvariablen"
-    ),
-    rating = as.numeric(rating)
+    Aspekt = factor(Aspekt, levels = aspekt_levels)
   ) %>%
-  filter(!is.na(rating))
+  group_by(Aspekt) %>%
+  summarise(
+    N = sum(!is.na(Score)),
+    Mittelwert = mean(Score, na.rm = TRUE),
+    Median = median(Score, na.rm = TRUE),
+    Standardabweichung = sd(Score, na.rm = TRUE),
+    Minimum = min(Score, na.rm = TRUE),
+    Maximum = max(Score, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(Aspekt)
+
+Deskriptiv_Gesamt
+
 
 ############################################################
-# 3. Promptbedingungen ebenfalls ins Long-Format bringen
+# 9. Forschungsfrage 1:
+# Absolute und relative Häufigkeiten je Studienplanungsaspekt
 ############################################################
 
-d_prompt_long <- d_long %>%
+# Hier werden die Einzelbewertungen innerhalb eines Aspekts zusammengefasst.
+# Pro Aspekt liegen pro Output zwei Einzelbewertungen vor.
+
+Haeufigkeiten_Aspekte_Wide <- d_ratings_long %>%
+  count(
+    Aspekt,
+    Rating,
+    name = "n"
+  ) %>%
+  group_by(Aspekt) %>%
+  complete(
+    Rating = rating_levels,
+    fill = list(n = 0)
+  ) %>%
+  mutate(
+    N_Einzelbewertungen = sum(n),
+    Haeufigkeit = format_n_percent(n, N_Einzelbewertungen),
+    Rating = paste0("Kodierung_", Rating)
+  ) %>%
+  ungroup() %>%
+  select(
+    Aspekt,
+    N_Einzelbewertungen,
+    Rating,
+    Haeufigkeit
+  ) %>%
+  pivot_wider(
+    names_from = Rating,
+    values_from = Haeufigkeit
+  ) %>%
+  arrange(Aspekt)
+
+Haeufigkeiten_Aspekte_Wide
+
+
+############################################################
+# 10. Forschungsfrage 2a:
+# Gesamtqualität nach Promptbedingung
+############################################################
+
+# Fragestellung:
+# Unterscheidet sich die aggregierte Gesamtqualität je nachdem,
+# ob eine Reflexionsanweisung bzw. Hypothesenbedingung vorlag?
+
+# Long-Format für Promptbedingungen erstellen:
+# Pro Output entstehen zwei Zeilen:
+# - eine für type bzw. Reflexionsanweisung
+# - eine für hypo bzw. Hypothesen
+d_prompt_scores_total <- d_scores %>%
+  select(
+    Output_ID,
+    type,
+    hypo,
+    Gesamtqualitaet
+  ) %>%
   pivot_longer(
     cols = c(type, hypo),
     names_to = "Promptvariable",
@@ -652,20 +429,213 @@ d_prompt_long <- d_long %>%
       Promptvariable == "type" ~ "Reflexionsanweisung",
       Promptvariable == "hypo" ~ "Hypothesen"
     ),
-    Bedingung = as.character(Bedingung)
+    Promptbedingung = factor(
+      Promptbedingung,
+      levels = prompt_levels
+    ),
+    Bedingung = factor(
+      Bedingung,
+      levels = condition_levels
+    )
   ) %>%
   filter(!is.na(Bedingung))
 
+# Deskriptive Kennwerte der Gesamtqualität nach Promptbedingung
+Deskriptiv_Prompt_Gesamt <- d_prompt_scores_total %>%
+  group_by(
+    Promptbedingung,
+    Bedingung
+  ) %>%
+  summarise(
+    N = sum(!is.na(Gesamtqualitaet)),
+    Mittelwert = mean(Gesamtqualitaet, na.rm = TRUE),
+    Standardabweichung = sd(Gesamtqualitaet, na.rm = TRUE),
+    Median = median(Gesamtqualitaet, na.rm = TRUE),
+    Minimum = min(Gesamtqualitaet, na.rm = TRUE),
+    Maximum = max(Gesamtqualitaet, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  group_by(Promptbedingung) %>%
+  mutate(
+    MW_Diff_yes_minus_no =
+      Mittelwert[Bedingung == "yes"][1] -
+      Mittelwert[Bedingung == "no"][1]
+  ) %>%
+  ungroup() %>%
+  arrange(
+    Promptbedingung,
+    Bedingung
+  )
+
+Deskriptiv_Prompt_Gesamt
+
+
 ############################################################
-# 4. Häufigkeiten berechnen
+# 11. Forschungsfrage 2a:
+# Häufigkeiten der Einzelbewertungen nach Promptbedingung
 ############################################################
 
-Haeufigkeiten_Aspekt_Prompt_Long <- d_prompt_long %>%
+# Hier werden alle sechs Einzelbewertungen gemeinsam betrachtet.
+# Die Tabelle zeigt, wie häufig die Kodierungen 1, 2 und 3 je
+# Promptbedingung vergeben wurden.
+
+d_prompt_ratings_long <- d_ratings_long %>%
+  pivot_longer(
+    cols = c(type, hypo),
+    names_to = "Promptvariable",
+    values_to = "Bedingung"
+  ) %>%
+  mutate(
+    Promptbedingung = case_when(
+      Promptvariable == "type" ~ "Reflexionsanweisung",
+      Promptvariable == "hypo" ~ "Hypothesen"
+    ),
+    Promptbedingung = factor(
+      Promptbedingung,
+      levels = prompt_levels
+    ),
+    Bedingung = factor(
+      Bedingung,
+      levels = condition_levels
+    )
+  ) %>%
+  filter(!is.na(Bedingung))
+
+Haeufigkeiten_Prompt_Gesamt <- d_prompt_ratings_long %>%
+  count(
+    Promptbedingung,
+    Bedingung,
+    Rating,
+    name = "n"
+  ) %>%
+  group_by(
+    Promptbedingung,
+    Bedingung
+  ) %>%
+  complete(
+    Rating = rating_levels,
+    fill = list(n = 0)
+  ) %>%
+  mutate(
+    N_Einzelbewertungen = sum(n),
+    Haeufigkeit = format_n_percent(n, N_Einzelbewertungen),
+    Rating = paste0("Kodierung_", Rating)
+  ) %>%
+  ungroup() %>%
+  select(
+    Promptbedingung,
+    Bedingung,
+    N_Einzelbewertungen,
+    Rating,
+    Haeufigkeit
+  ) %>%
+  pivot_wider(
+    names_from = Rating,
+    values_from = Haeufigkeit
+  ) %>%
+  arrange(
+    Promptbedingung,
+    Bedingung
+  )
+
+Haeufigkeiten_Prompt_Gesamt
+
+
+############################################################
+# 12. Forschungsfrage 2b:
+# Deskriptive Kennwerte je Studienplanungsaspekt und Promptbedingung
+############################################################
+
+# Hier wird untersucht, ob sich die Qualität innerhalb einzelner
+# Studienplanungsaspekte zwischen den Promptbedingungen unterscheidet.
+
+d_aspect_scores_long <- d_scores %>%
+  select(
+    Output_ID,
+    type,
+    hypo,
+    all_of(names(aspect_cols))
+  ) %>%
+  pivot_longer(
+    cols = all_of(names(aspect_cols)),
+    names_to = "Aspekt",
+    values_to = "Score"
+  ) %>%
+  pivot_longer(
+    cols = c(type, hypo),
+    names_to = "Promptvariable",
+    values_to = "Bedingung"
+  ) %>%
+  mutate(
+    Aspekt = factor(
+      Aspekt,
+      levels = aspekt_levels
+    ),
+    Promptbedingung = case_when(
+      Promptvariable == "type" ~ "Reflexionsanweisung",
+      Promptvariable == "hypo" ~ "Hypothesen"
+    ),
+    Promptbedingung = factor(
+      Promptbedingung,
+      levels = prompt_levels
+    ),
+    Bedingung = factor(
+      Bedingung,
+      levels = condition_levels
+    )
+  ) %>%
+  filter(!is.na(Bedingung))
+
+Deskriptiv_Aspekt_Prompt <- d_aspect_scores_long %>%
+  group_by(
+    Aspekt,
+    Promptbedingung,
+    Bedingung
+  ) %>%
+  summarise(
+    N = sum(!is.na(Score)),
+    Mittelwert = mean(Score, na.rm = TRUE),
+    Standardabweichung = sd(Score, na.rm = TRUE),
+    Median = median(Score, na.rm = TRUE),
+    Minimum = min(Score, na.rm = TRUE),
+    Maximum = max(Score, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  group_by(
+    Aspekt,
+    Promptbedingung
+  ) %>%
+  mutate(
+    MW_Diff_yes_minus_no =
+      Mittelwert[Bedingung == "yes"][1] -
+      Mittelwert[Bedingung == "no"][1]
+  ) %>%
+  ungroup() %>%
+  arrange(
+    Aspekt,
+    Promptbedingung,
+    Bedingung
+  )
+
+Deskriptiv_Aspekt_Prompt
+
+
+############################################################
+# 13. Forschungsfrage 2b:
+# Häufigkeiten je Studienplanungsaspekt und Promptbedingung
+############################################################
+
+# Diese Tabelle zeigt die Verteilung der Einzelbewertungen getrennt nach:
+# - Studienplanungsaspekt
+# - Promptbedingung
+# - yes/no-Bedingung
+
+Haeufigkeiten_Aspekt_Prompt_Wide <- d_prompt_ratings_long %>%
   count(
     Aspekt,
     Promptbedingung,
     Bedingung,
-    rating,
+    Rating,
     name = "n"
   ) %>%
   group_by(
@@ -674,70 +644,26 @@ Haeufigkeiten_Aspekt_Prompt_Long <- d_prompt_long %>%
     Bedingung
   ) %>%
   complete(
-    rating = c(1, 2, 3),
+    Rating = rating_levels,
     fill = list(n = 0)
-  ) %>%
-  ungroup() %>%
-  group_by(
-    Aspekt,
-    Promptbedingung,
-    Bedingung,
-    rating
-  ) %>%
-  summarise(
-    n = sum(n),
-    .groups = "drop"
-  ) %>%
-  group_by(
-    Aspekt,
-    Promptbedingung,
-    Bedingung
   ) %>%
   mutate(
     N_Einzelbewertungen = sum(n),
-    Prozent = n / N_Einzelbewertungen * 100,
-    Häufigkeit = sprintf("%d (%.1f%%)", n, Prozent)
+    Haeufigkeit = format_n_percent(n, N_Einzelbewertungen),
+    Rating = paste0("Kodierung_", Rating)
   ) %>%
-  ungroup()
-
-############################################################
-# 5. Wide-Tabelle erstellen
-############################################################
-
-Haeufigkeiten_Aspekt_Prompt_Wide <- Haeufigkeiten_Aspekt_Prompt_Long %>%
-  mutate(
-    Aspekt = factor(
-      Aspekt,
-      levels = c(
-        "Studiendesign",
-        "Messinstrumente",
-        "Kontrollvariablen"
-      )
-    ),
-    Promptbedingung = factor(
-      Promptbedingung,
-      levels = c(
-        "Reflexionsanweisung",
-        "Hypothesen"
-      )
-    ),
-    Bedingung = factor(
-      Bedingung,
-      levels = c("yes", "no")
-    ),
-    rating = paste0("Kodierung_", rating)
-  ) %>%
+  ungroup() %>%
   select(
     Aspekt,
     Promptbedingung,
     Bedingung,
     N_Einzelbewertungen,
-    rating,
-    Häufigkeit
+    Rating,
+    Haeufigkeit
   ) %>%
   pivot_wider(
-    names_from = rating,
-    values_from = Häufigkeit
+    names_from = Rating,
+    values_from = Haeufigkeit
   ) %>%
   arrange(
     Aspekt,
@@ -745,96 +671,23 @@ Haeufigkeiten_Aspekt_Prompt_Wide <- Haeufigkeiten_Aspekt_Prompt_Long %>%
     Bedingung
   )
 
-Haeufigkeiten_Aspekt_Prompt_Wide # Abgleich mit Tabelle 6
+Haeufigkeiten_Aspekt_Prompt_Wide
 
-
-
-###############################################################################################################################
-# Tabelle: Deskriptive Kennwerte nach Promptbedingung, Studienplanungsaspekt und Bewertungsdimension (explorative Analyse)#####
-###############################################################################################################################
 
 ############################################################
-# Zuordnung der Rating-Variablen zu Aspekt und Dimension
+# 14. Explorative Analyse:
+# Deskriptive Kennwerte nach Promptbedingung,
+# Studienplanungsaspekt und Bewertungsdimension
 ############################################################
 
-rating_info <- tribble(
-  ~rating_variable,               ~Aspekt,              ~Bewertungsdimension,
-  "Studiendesign_rating",         "Studiendesign",      "Angemessenheit",
-  "Krit_Studiendesign_rating",    "Studiendesign",      "Entscheidungshilfe",
-  "Messinstrumente_rating",       "Messinstrumente",    "Angemessenheit",
-  "Krit_Messinstr_rating",        "Messinstrumente",    "Entscheidungshilfe",
-  "Kontrollvariablen_rating",     "Kontrollvariablen",  "Angemessenheit",
-  "Krit_Kontrollvar_rating",      "Kontrollvariablen",  "Entscheidungshilfe"
-)
+# Diese Tabelle betrachtet die Einzelbewertungen noch feiner:
+# getrennt nach
+# - Studienplanungsaspekt
+# - Bewertungsdimension
+# - Promptbedingung
+# - yes/no-Bedingung
 
-############################################################
-# Daten ins Long-Format bringen
-############################################################
-
-d_long_vergleich <- d %>%
-  mutate(Output_ID = row_number()) %>%
-  pivot_longer(
-    cols = all_of(rating_info$rating_variable),
-    names_to = "rating_variable",
-    values_to = "Rating"
-  ) %>%
-  left_join(rating_info, by = "rating_variable") %>%
-  pivot_longer(
-    cols = c(type, hypo),
-    names_to = "Promptvariable",
-    values_to = "Bedingung"
-  ) %>%
-  mutate(
-    Rating = as.numeric(Rating),
-    
-    Promptbedingung = case_when(
-      Promptvariable == "type" ~ "Reflexionsanweisung",
-      Promptvariable == "hypo" ~ "Hypothesen"
-    ),
-    
-    Bedingung = case_when(
-      tolower(as.character(Bedingung)) %in% c("yes", "ja", "1", "true") ~ "ja",
-      tolower(as.character(Bedingung)) %in% c("no", "nein", "0", "false") ~ "nein",
-      TRUE ~ as.character(Bedingung)
-    ),
-    
-    Aspekt = factor(
-      Aspekt,
-      levels = c(
-        "Studiendesign",
-        "Messinstrumente",
-        "Kontrollvariablen"
-      )
-    ),
-    
-    Bewertungsdimension = factor(
-      Bewertungsdimension,
-      levels = c(
-        "Angemessenheit",
-        "Entscheidungshilfe"
-      )
-    ),
-    
-    Promptbedingung = factor(
-      Promptbedingung,
-      levels = c(
-        "Reflexionsanweisung",
-        "Hypothesen"
-      )
-    ),
-    
-    Bedingung = factor(
-      Bedingung,
-      levels = c("ja", "nein")
-    )
-  ) %>%
-  filter(!is.na(Rating), !is.na(Bedingung))
-
-############################################################
-# Deskriptive Kennwerte berechnen
-############################################################
-
-tabelle_vergleich <- d_long_vergleich %>%
+Tabelle_Explorativ_Dimension <- d_prompt_ratings_long %>%
   group_by(
     Aspekt,
     Bewertungsdimension,
@@ -843,11 +696,11 @@ tabelle_vergleich <- d_long_vergleich %>%
   ) %>%
   summarise(
     N = n(),
-    M = mean(Rating, na.rm = TRUE),
-    Md = median(Rating, na.rm = TRUE),
-    SD = sd(Rating, na.rm = TRUE),
-    Min = min(Rating, na.rm = TRUE),
-    Max = max(Rating, na.rm = TRUE),
+    Mittelwert = mean(Rating, na.rm = TRUE),
+    Median = median(Rating, na.rm = TRUE),
+    Standardabweichung = sd(Rating, na.rm = TRUE),
+    Minimum = min(Rating, na.rm = TRUE),
+    Maximum = max(Rating, na.rm = TRUE),
     .groups = "drop"
   ) %>%
   group_by(
@@ -856,9 +709,9 @@ tabelle_vergleich <- d_long_vergleich %>%
     Promptbedingung
   ) %>%
   mutate(
-    MW_Diff_ja_minus_nein =
-      M[match("ja", Bedingung)] -
-      M[match("nein", Bedingung)]
+    MW_Diff_yes_minus_no =
+      Mittelwert[Bedingung == "yes"][1] -
+      Mittelwert[Bedingung == "no"][1]
   ) %>%
   ungroup() %>%
   arrange(
@@ -868,5 +721,107 @@ tabelle_vergleich <- d_long_vergleich %>%
     Bedingung
   )
 
-tabelle_vergleich # Abgleich mit Tabelle 8
-View(tabelle_vergleich)
+Tabelle_Explorativ_Dimension
+
+
+############################################################
+# 15. Ergebnisse speichern
+############################################################
+
+# Tabellen werden als CSV-Dateien gespeichert.
+# Dadurch können sie unabhängig von R geöffnet und geprüft werden.
+
+write.csv(
+  tab_kodierungen_dimension,
+  file = file.path("results", "tab_kodierungen_dimension.csv"),
+  row.names = FALSE,
+  fileEncoding = "UTF-8"
+)
+
+write.csv(
+  Deskriptiv_Gesamt,
+  file = file.path("results", "deskriptiv_gesamt.csv"),
+  row.names = FALSE,
+  fileEncoding = "UTF-8"
+)
+
+write.csv(
+  Haeufigkeiten_Aspekte_Wide,
+  file = file.path("results", "haeufigkeiten_aspekte_wide.csv"),
+  row.names = FALSE,
+  fileEncoding = "UTF-8"
+)
+
+write.csv(
+  Deskriptiv_Prompt_Gesamt,
+  file = file.path("results", "deskriptiv_prompt_gesamt.csv"),
+  row.names = FALSE,
+  fileEncoding = "UTF-8"
+)
+
+write.csv(
+  Haeufigkeiten_Prompt_Gesamt,
+  file = file.path("results", "haeufigkeiten_prompt_gesamt.csv"),
+  row.names = FALSE,
+  fileEncoding = "UTF-8"
+)
+
+write.csv(
+  Deskriptiv_Aspekt_Prompt,
+  file = file.path("results", "deskriptiv_aspekt_prompt.csv"),
+  row.names = FALSE,
+  fileEncoding = "UTF-8"
+)
+
+write.csv(
+  Haeufigkeiten_Aspekt_Prompt_Wide,
+  file = file.path("results", "haeufigkeiten_aspekt_prompt_wide.csv"),
+  row.names = FALSE,
+  fileEncoding = "UTF-8"
+)
+
+write.csv(
+  Tabelle_Explorativ_Dimension,
+  file = file.path("results", "tabelle_explorativ_dimension.csv"),
+  row.names = FALSE,
+  fileEncoding = "UTF-8"
+)
+
+# Zusätzlich alle zentralen Tabellen als RDS-Datei speichern.
+# Das erhält Objektstrukturen und Faktoren besser als CSV.
+saveRDS(
+  list(
+    tab_kodierungen_dimension = tab_kodierungen_dimension,
+    Deskriptiv_Gesamt = Deskriptiv_Gesamt,
+    Haeufigkeiten_Aspekte_Wide = Haeufigkeiten_Aspekte_Wide,
+    Deskriptiv_Prompt_Gesamt = Deskriptiv_Prompt_Gesamt,
+    Haeufigkeiten_Prompt_Gesamt = Haeufigkeiten_Prompt_Gesamt,
+    Deskriptiv_Aspekt_Prompt = Deskriptiv_Aspekt_Prompt,
+    Haeufigkeiten_Aspekt_Prompt_Wide = Haeufigkeiten_Aspekt_Prompt_Wide,
+    Tabelle_Explorativ_Dimension = Tabelle_Explorativ_Dimension
+  ),
+  file = file.path("results", "alle_ergebnistabellen.rds")
+)
+
+
+############################################################
+# 16. Reproduzierbarkeit dokumentieren
+############################################################
+
+# sessionInfo() dokumentiert:
+# - R-Version
+# - Betriebssystem
+# - geladene Pakete
+# - Paketversionen
+#
+# Diese Information ist wichtig, damit andere Personen die Analyse
+# später möglichst exakt reproduzieren können.
+
+sink(file.path("results", "sessionInfo.txt"))
+print(sessionInfo())
+sink()
+
+
+############################################################
+# Ende des Skripts
+############################################################
