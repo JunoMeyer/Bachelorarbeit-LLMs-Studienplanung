@@ -1,0 +1,13 @@
+"Aspekt","Promptbedingung","Bedingung","N","Mittelwert","Standardabweichung","Median","Minimum","Maximum","MW_Diff_yes_minus_no"
+"Studiendesign","Reflexionsanweisung","yes",20,3,0,3,3,3,0.95
+"Studiendesign","Reflexionsanweisung","no",20,2.05,0.153896752812773,2,2,2.5,0.95
+"Studiendesign","Hypothesen","yes",20,2.525,0.499341671867227,2.75,2,3,0
+"Studiendesign","Hypothesen","no",20,2.525,0.499341671867227,2.75,2,3,0
+"Messinstrumente","Reflexionsanweisung","yes",20,2.1,0.205195670417031,2,2,2.5,0.55
+"Messinstrumente","Reflexionsanweisung","no",20,1.55,0.153896752812773,1.5,1.5,2,0.55
+"Messinstrumente","Hypothesen","yes",20,1.825,0.335410196624968,2,1.5,2.5,0
+"Messinstrumente","Hypothesen","no",20,1.825,0.335410196624968,2,1.5,2.5,0
+"Kontrollvariablen","Reflexionsanweisung","yes",20,1.375,0.455232734000163,1.5,1,2.5,0.05
+"Kontrollvariablen","Reflexionsanweisung","no",20,1.325,0.244680242464796,1.5,1,1.5,0.05
+"Kontrollvariablen","Hypothesen","yes",20,1.35,0.366347548532523,1.5,1,2.5,0
+"Kontrollvariablen","Hypothesen","no",20,1.35,0.366347548532523,1.5,1,2.5,0
