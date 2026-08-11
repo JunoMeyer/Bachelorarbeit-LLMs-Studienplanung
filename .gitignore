@@ -47,3 +47,17 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# renv local package library
+renv/library/
+renv/staging/
+renv/sandbox/
+renv/local/
+
+# Temporary Office files
+~$*
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+desktop.ini
