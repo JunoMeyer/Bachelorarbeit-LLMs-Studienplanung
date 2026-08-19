@@ -1,4 +1,4 @@
-"Aspekt","N","Mittelwert","Median","Standardabweichung","Minimum","Maximum"
-"Studiendesign",40,2.525,2.75,0.492898283572501,2,3
-"Messinstrumente",40,1.825,2,0.331082141794728,1.5,2.5
-"Kontrollvariablen",40,1.35,1.5,0.36162028533979,1,2.5
+"Aspekt","N","Mittelwert","Median","Standardabweichung"
+"Studiendesign",40,2.525,2.75,0.492898283572501
+"Messinstrumente",40,1.825,2,0.331082141794728
+"Kontrollvariablen",40,1.35,1.5,0.36162028533979

@@ -358,8 +358,6 @@ Deskriptiv_Gesamt <- d_scores %>%
     Mittelwert = mean(Score, na.rm = TRUE),
     Median = median(Score, na.rm = TRUE),
     Standardabweichung = sd(Score, na.rm = TRUE),
-    Minimum = min(Score, na.rm = TRUE),
-    Maximum = max(Score, na.rm = TRUE),
     .groups = "drop"
   ) %>%
   arrange(Aspekt)
@@ -459,8 +457,6 @@ Deskriptiv_Prompt_Gesamt <- d_prompt_scores_total %>%
     Mittelwert = mean(Gesamtqualitaet, na.rm = TRUE),
     Standardabweichung = sd(Gesamtqualitaet, na.rm = TRUE),
     Median = median(Gesamtqualitaet, na.rm = TRUE),
-    Minimum = min(Gesamtqualitaet, na.rm = TRUE),
-    Maximum = max(Gesamtqualitaet, na.rm = TRUE),
     .groups = "drop"
   ) %>%
   group_by(Promptbedingung) %>%
@@ -605,8 +601,6 @@ Deskriptiv_Aspekt_Prompt <- d_aspect_scores_long %>%
     Mittelwert = mean(Score, na.rm = TRUE),
     Standardabweichung = sd(Score, na.rm = TRUE),
     Median = median(Score, na.rm = TRUE),
-    Minimum = min(Score, na.rm = TRUE),
-    Maximum = max(Score, na.rm = TRUE),
     .groups = "drop"
   ) %>%
   group_by(
@@ -707,8 +701,6 @@ Tabelle_Explorativ_Dimension <- d_prompt_ratings_long %>%
     Mittelwert = mean(Rating, na.rm = TRUE),
     Median = median(Rating, na.rm = TRUE),
     Standardabweichung = sd(Rating, na.rm = TRUE),
-    Minimum = min(Rating, na.rm = TRUE),
-    Maximum = max(Rating, na.rm = TRUE),
     .groups = "drop"
   ) %>%
   group_by(
