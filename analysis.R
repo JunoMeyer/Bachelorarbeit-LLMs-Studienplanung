@@ -5,8 +5,9 @@
 # Hinweis: dieses Skript wurde mit GPT-5.5 erstellt und durch die Autorin geprüft
 #
 # Zweck des Skripts:
-# Dieses Skript berechnet deskriptive Statistiken sowie absolute
-# und relative Häufigkeiten für die in der Bachelorarbeit berichteten
+# Dieses Skript berechnet absolute
+# und relative Häufigkeiten der Einzelkodierungen pro Bewertungsdimension 
+# sowie die deskriptiven Kennwerte für die in der Bachelorarbeit berichteten
 # Tabellen. Analysiert werden Ratings zu drei Studienplanungsaspekten:
 #   1. Studiendesign
 #   2. Messinstrumente
@@ -555,7 +556,7 @@ d_prompt_ratings_long <- d_ratings_long %>%
 # - Promptbedingung
 # - yes/no-Bedingung
 
-F2b_Deskriptiv_Dimension <- d_prompt_ratings_long %>%
+F2b_Deskriptiv_Aspekt_Prompt_Dimension <- d_prompt_ratings_long %>%
   group_by(
     Aspekt,
     Bewertungsdimension,
@@ -587,7 +588,7 @@ F2b_Deskriptiv_Dimension <- d_prompt_ratings_long %>%
     Bedingung
   )
 
-F2b_Deskriptiv_Dimension 
+F2b_Deskriptiv_Aspekt_Prompt_Dimension 
 
 
 ############################################################
@@ -629,8 +630,8 @@ write.csv(
 
 
 write.csv(
-  F2b_Deskriptiv_Dimension,
-  file = file.path("results", "F2b_Deskriptiv_Dimension.csv"),
+  F2b_Deskriptiv_Aspekt_Prompt_Dimension,
+  file = file.path("results", "F2b_deskriptiv_aspekt_prompt_dimension.csv"),
   row.names = FALSE,
   fileEncoding = "UTF-8"
 )
@@ -643,7 +644,7 @@ saveRDS(
     F1_Deskriptiv_Gesamt = F1_Deskriptiv_Gesamt,
     F2a_Deskriptiv_Prompt_Gesamt = F2a_Deskriptiv_Prompt_Gesamt,
     F2b_Deskriptiv_Aspekt_Prompt  = F2b_Deskriptiv_Aspekt_Prompt,
-    F2b_Deskriptiv_Dimension = F2b_Deskriptiv_Dimension
+    F2b_Deskriptiv_Aspekt_Prompt_Dimension =  F2b_Deskriptiv_Aspekt_Prompt_Dimension
   ),
   file = file.path("results", "alle_ergebnistabellen.rds")
 )
