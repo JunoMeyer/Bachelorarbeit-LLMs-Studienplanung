@@ -275,7 +275,7 @@ tab_kodierungen_dimension <- d_ratings_long %>%
     Bewertungsdimension
   )
 
-tab_kodierungen_dimension # Vergleich Tabelle 1 im Bericht
+tab_kodierungen_dimension 
 
 
 ############################################################
@@ -339,7 +339,7 @@ d_scores$Gesamtqualitaet <- safe_row_mean(
 )
 
 # Deskriptive Kennwerte pro Studienplanungsaspekt
-Deskriptiv_Gesamt <- d_scores %>%
+F1_Deskriptiv_Gesamt <- d_scores %>%
   select(
     Output_ID,
     all_of(names(aspect_cols))
@@ -362,48 +362,7 @@ Deskriptiv_Gesamt <- d_scores %>%
   ) %>%
   arrange(Aspekt)
 
-Deskriptiv_Gesamt # Vergleich Tabelle 2 im Bericht
-
-
-############################################################
-# 9. Forschungsfrage 1:
-# Absolute und relative Häufigkeiten je Studienplanungsaspekt
-############################################################
-
-# Hier werden die Einzelbewertungen innerhalb eines Aspekts zusammengefasst.
-# Pro Aspekt liegen pro Output zwei Einzelbewertungen vor.
-
-Haeufigkeiten_Aspekte_Wide <- d_ratings_long %>%
-  count(
-    Aspekt,
-    Rating,
-    name = "n"
-  ) %>%
-  group_by(Aspekt) %>%
-  complete(
-    Rating = rating_levels,
-    fill = list(n = 0)
-  ) %>%
-  mutate(
-    N_Einzelbewertungen = sum(n),
-    Haeufigkeit = format_n_percent(n, N_Einzelbewertungen),
-    Rating = paste0("Kodierung_", Rating)
-  ) %>%
-  ungroup() %>%
-  select(
-    Aspekt,
-    N_Einzelbewertungen,
-    Rating,
-    Haeufigkeit
-  ) %>%
-  pivot_wider(
-    names_from = Rating,
-    values_from = Haeufigkeit
-  ) %>%
-  arrange(Aspekt)
-
-Haeufigkeiten_Aspekte_Wide # Vergleich Tabelle 1 im Bericht (Gesamt pro Aspekt)
-
+F1_Deskriptiv_Gesamt 
 
 ############################################################
 # 10. Forschungsfrage 2a:
@@ -447,7 +406,7 @@ d_prompt_scores_total <- d_scores %>%
   filter(!is.na(Bedingung))
 
 # Deskriptive Kennwerte der Gesamtqualität nach Promptbedingung
-Deskriptiv_Prompt_Gesamt <- d_prompt_scores_total %>%
+F2a_Deskriptiv_Prompt_Gesamt <- d_prompt_scores_total %>%
   group_by(
     Promptbedingung,
     Bedingung
@@ -471,79 +430,7 @@ Deskriptiv_Prompt_Gesamt <- d_prompt_scores_total %>%
     Bedingung
   )
 
-Deskriptiv_Prompt_Gesamt # Vergleich Tabelle 3 im Bericht
-
-
-############################################################
-# 11. Forschungsfrage 2a:
-# Häufigkeiten der Einzelbewertungen nach Promptbedingung
-############################################################
-
-# Hier werden alle sechs Einzelbewertungen gemeinsam betrachtet.
-# Die Tabelle zeigt, wie häufig die Kodierungen 1, 2 und 3 je
-# Promptbedingung vergeben wurden.
-
-d_prompt_ratings_long <- d_ratings_long %>%
-  pivot_longer(
-    cols = c(type, hypo),
-    names_to = "Promptvariable",
-    values_to = "Bedingung"
-  ) %>%
-  mutate(
-    Promptbedingung = case_when(
-      Promptvariable == "type" ~ "Reflexionsanweisung",
-      Promptvariable == "hypo" ~ "Hypothesen"
-    ),
-    Promptbedingung = factor(
-      Promptbedingung,
-      levels = prompt_levels
-    ),
-    Bedingung = factor(
-      Bedingung,
-      levels = condition_levels
-    )
-  ) %>%
-  filter(!is.na(Bedingung))
-
-Haeufigkeiten_Prompt_Gesamt <- d_prompt_ratings_long %>%
-  count(
-    Promptbedingung,
-    Bedingung,
-    Rating,
-    name = "n"
-  ) %>%
-  group_by(
-    Promptbedingung,
-    Bedingung
-  ) %>%
-  complete(
-    Rating = rating_levels,
-    fill = list(n = 0)
-  ) %>%
-  mutate(
-    N_Einzelbewertungen = sum(n),
-    Haeufigkeit = format_n_percent(n, N_Einzelbewertungen),
-    Rating = paste0("Kodierung_", Rating)
-  ) %>%
-  ungroup() %>%
-  select(
-    Promptbedingung,
-    Bedingung,
-    N_Einzelbewertungen,
-    Rating,
-    Haeufigkeit
-  ) %>%
-  pivot_wider(
-    names_from = Rating,
-    values_from = Haeufigkeit
-  ) %>%
-  arrange(
-    Promptbedingung,
-    Bedingung
-  )
-
-Haeufigkeiten_Prompt_Gesamt # Vergleich Tabelle 4 im Bericht
-
+F2a_Deskriptiv_Prompt_Gesamt 
 
 ############################################################
 # 12. Forschungsfrage 2b:
@@ -590,7 +477,7 @@ d_aspect_scores_long <- d_scores %>%
   ) %>%
   filter(!is.na(Bedingung))
 
-Deskriptiv_Aspekt_Prompt <- d_aspect_scores_long %>%
+F2b_Deskriptiv_Aspekt_Prompt <- d_aspect_scores_long %>%
   group_by(
     Aspekt,
     Promptbedingung,
@@ -619,65 +506,10 @@ Deskriptiv_Aspekt_Prompt <- d_aspect_scores_long %>%
     Bedingung
   )
 
-Deskriptiv_Aspekt_Prompt # Vergleich Tabelle 5 im Bericht
-
-
-############################################################
-# 13. Forschungsfrage 2b:
-# Häufigkeiten je Studienplanungsaspekt und Promptbedingung
-############################################################
-
-# Diese Tabelle zeigt die Verteilung der Einzelbewertungen getrennt nach:
-# - Studienplanungsaspekt
-# - Promptbedingung
-# - yes/no-Bedingung
-
-Haeufigkeiten_Aspekt_Prompt_Wide <- d_prompt_ratings_long %>%
-  count(
-    Aspekt,
-    Promptbedingung,
-    Bedingung,
-    Rating,
-    name = "n"
-  ) %>%
-  group_by(
-    Aspekt,
-    Promptbedingung,
-    Bedingung
-  ) %>%
-  complete(
-    Rating = rating_levels,
-    fill = list(n = 0)
-  ) %>%
-  mutate(
-    N_Einzelbewertungen = sum(n),
-    Haeufigkeit = format_n_percent(n, N_Einzelbewertungen),
-    Rating = paste0("Kodierung_", Rating)
-  ) %>%
-  ungroup() %>%
-  select(
-    Aspekt,
-    Promptbedingung,
-    Bedingung,
-    N_Einzelbewertungen,
-    Rating,
-    Haeufigkeit
-  ) %>%
-  pivot_wider(
-    names_from = Rating,
-    values_from = Haeufigkeit
-  ) %>%
-  arrange(
-    Aspekt,
-    Promptbedingung,
-    Bedingung
-  )
-
-Haeufigkeiten_Aspekt_Prompt_Wide # Vergleich Tabelle 6 im Bericht
-
+F2b_Deskriptiv_Aspekt_Prompt 
 
 ############################################################
-# 14. Explorative Analyse:
+# 14. Frage 2b: 
 # Deskriptive Kennwerte nach Promptbedingung,
 # Studienplanungsaspekt und Bewertungsdimension
 ############################################################
@@ -689,7 +521,7 @@ Haeufigkeiten_Aspekt_Prompt_Wide # Vergleich Tabelle 6 im Bericht
 # - Promptbedingung
 # - yes/no-Bedingung
 
-Tabelle_Explorativ_Dimension <- d_prompt_ratings_long %>%
+F2b_Deskriptiv_Dimension <- d_prompt_ratings_long %>%
   group_by(
     Aspekt,
     Bewertungsdimension,
@@ -721,7 +553,7 @@ Tabelle_Explorativ_Dimension <- d_prompt_ratings_long %>%
     Bedingung
   )
 
-Tabelle_Explorativ_Dimension # vergleich Tabelle 7 im Bericht 
+F2b_Deskriptiv_Dimension 
 
 
 ############################################################
@@ -739,50 +571,32 @@ write.csv(
 )
 
 write.csv(
-  Deskriptiv_Gesamt,
-  file = file.path("results", "deskriptiv_gesamt.csv"),
+  F1_Deskriptiv_Gesamt,
+  file = file.path("results", "F1_deskriptiv_gesamt.csv"),
   row.names = FALSE,
   fileEncoding = "UTF-8"
 )
 
+
 write.csv(
-  Haeufigkeiten_Aspekte_Wide,
-  file = file.path("results", "haeufigkeiten_aspekte_wide.csv"),
+  F2a_Deskriptiv_Prompt_Gesamt,
+  file = file.path("results", "F2a_deskriptiv_prompt_gesamt.csv"),
   row.names = FALSE,
   fileEncoding = "UTF-8"
 )
 
+
 write.csv(
-  Deskriptiv_Prompt_Gesamt,
-  file = file.path("results", "deskriptiv_prompt_gesamt.csv"),
+  F2b_Deskriptiv_Aspekt_Prompt ,
+  file = file.path("results", "F2b_deskriptiv_aspekt_prompt.csv"),
   row.names = FALSE,
   fileEncoding = "UTF-8"
 )
 
-write.csv(
-  Haeufigkeiten_Prompt_Gesamt,
-  file = file.path("results", "haeufigkeiten_prompt_gesamt.csv"),
-  row.names = FALSE,
-  fileEncoding = "UTF-8"
-)
 
 write.csv(
-  Deskriptiv_Aspekt_Prompt,
-  file = file.path("results", "deskriptiv_aspekt_prompt.csv"),
-  row.names = FALSE,
-  fileEncoding = "UTF-8"
-)
-
-write.csv(
-  Haeufigkeiten_Aspekt_Prompt_Wide,
-  file = file.path("results", "haeufigkeiten_aspekt_prompt_wide.csv"),
-  row.names = FALSE,
-  fileEncoding = "UTF-8"
-)
-
-write.csv(
-  Tabelle_Explorativ_Dimension,
-  file = file.path("results", "tabelle_explorativ_dimension.csv"),
+  F2b_Deskriptiv_Dimension,
+  file = file.path("results", "F2b_Deskriptiv_Dimension.csv"),
   row.names = FALSE,
   fileEncoding = "UTF-8"
 )
@@ -792,131 +606,14 @@ write.csv(
 saveRDS(
   list(
     tab_kodierungen_dimension = tab_kodierungen_dimension,
-    Deskriptiv_Gesamt = Deskriptiv_Gesamt,
-    Haeufigkeiten_Aspekte_Wide = Haeufigkeiten_Aspekte_Wide,
-    Deskriptiv_Prompt_Gesamt = Deskriptiv_Prompt_Gesamt,
-    Haeufigkeiten_Prompt_Gesamt = Haeufigkeiten_Prompt_Gesamt,
-    Deskriptiv_Aspekt_Prompt = Deskriptiv_Aspekt_Prompt,
-    Haeufigkeiten_Aspekt_Prompt_Wide = Haeufigkeiten_Aspekt_Prompt_Wide,
-    Tabelle_Explorativ_Dimension = Tabelle_Explorativ_Dimension
+    F1_Deskriptiv_Gesamt = F1_Deskriptiv_Gesamt,
+    F2a_Deskriptiv_Prompt_Gesamt = F2a_Deskriptiv_Prompt_Gesamt,
+    F2b_Deskriptiv_Aspekt_Prompt  = F2b_Deskriptiv_Aspekt_Prompt,
+    F2b_Deskriptiv_Dimension = F2b_Deskriptiv_Dimension
   ),
   file = file.path("results", "alle_ergebnistabellen.rds")
 )
 
-############################################################
-# 16. Ergänzende Tabelle:
-# Häufigkeiten der Einzelbewertungen nach Studienplanungsaspekt,
-# Bewertungsdimension und Promptbedingung
-############################################################
-
-# Diese Tabelle ergänzt die explorative Analyse aus Abschnitt 14.
-# Sie zeigt, wie häufig die Kodierungen 1, 2 und 3 vergeben wurden,
-# getrennt nach:
-# - Studienplanungsaspekt
-# - Bewertungsdimension
-# - Promptbedingung
-# - yes/no-Bedingung
-#
-# Grundlage sind die Einzelbewertungen der LLM-Outputs.
-
-Haeufigkeiten_Dimension_Prompt_Wide <- d_prompt_ratings_long %>%
-  count(
-    Aspekt,
-    Bewertungsdimension,
-    Promptbedingung,
-    Bedingung,
-    Rating,
-    name = "n"
-  ) %>%
-  group_by(
-    Aspekt,
-    Bewertungsdimension,
-    Promptbedingung,
-    Bedingung
-  ) %>%
-  complete(
-    Rating = rating_levels,
-    fill = list(n = 0)
-  ) %>%
-  mutate(
-    N_Einzelbewertungen = sum(n),
-    Haeufigkeit = format_n_percent(n, N_Einzelbewertungen),
-    Rating = paste0("Kodierung_", Rating)
-  ) %>%
-  ungroup() %>%
-  select(
-    Aspekt,
-    Bewertungsdimension,
-    Promptbedingung,
-    Bedingung,
-    N_Einzelbewertungen,
-    Rating,
-    Haeufigkeit
-  ) %>%
-  pivot_wider(
-    names_from = Rating,
-    values_from = Haeufigkeit
-  ) %>%
-  arrange(
-    Aspekt,
-    Bewertungsdimension,
-    Promptbedingung,
-    Bedingung
-  )
-
-Haeufigkeiten_Dimension_Prompt_Wide # noch keine vergleichbare Tabelle im Bericht 
-
-
-############################################################
-# 17. Ergänzende Tabelle speichern
-############################################################
-
-# Die ergänzende Häufigkeitstabelle wird als CSV-Datei gespeichert.
-
-write.csv(
-  Haeufigkeiten_Dimension_Prompt_Wide,
-  file = file.path(
-    "results",
-    "haeufigkeiten_dimension_prompt_wide.csv"
-  ),
-  row.names = FALSE,
-  fileEncoding = "UTF-8"
-)
-
-# Zusätzlich wird die Tabelle als einzelne RDS-Datei gespeichert.
-# Dadurch bleiben Objektstruktur und Faktorinformationen erhalten.
-
-saveRDS(
-  Haeufigkeiten_Dimension_Prompt_Wide,
-  file = file.path(
-    "results",
-    "haeufigkeiten_dimension_prompt_wide.rds"
-  )
-)
-
-# Falls bereits eine zentrale RDS-Datei mit allen Ergebnistabellen
-# existiert, wird diese um die neue Tabelle ergänzt.
-# Dadurch bleibt die neue Tabelle auch in der zentralen Ergebnisdatei
-# dokumentiert.
-
-ergebnistabellen_path <- file.path(
-  "results",
-  "alle_ergebnistabellen.rds"
-)
-
-if (file.exists(ergebnistabellen_path)) {
-  
-  alle_ergebnistabellen <- readRDS(ergebnistabellen_path)
-  
-  alle_ergebnistabellen$Haeufigkeiten_Dimension_Prompt_Wide <-
-    Haeufigkeiten_Dimension_Prompt_Wide
-  
-  saveRDS(
-    alle_ergebnistabellen,
-    file = ergebnistabellen_path
-  )
-  
-}
 ############################################################
 # 18. Reproduzierbarkeit dokumentieren
 ############################################################
