@@ -514,6 +514,40 @@ F2b_Deskriptiv_Aspekt_Prompt
 # Studienplanungsaspekt und Bewertungsdimension
 ############################################################
 
+############################################################
+# 13. Long-Format der Einzelbewertungen nach Promptbedingung
+############################################################
+
+# Für die Auswertung nach Bewertungsdimension und Promptbedingung
+# wird das Long-Format der Einzelratings zusätzlich nach den beiden
+# Promptvariablen type und hypo aufgefächert.
+#
+# Pro Einzelbewertung entstehen dadurch zwei Zeilen:
+# - eine für die Reflexionsanweisung
+# - eine für die Hypothesenbedingung
+
+d_prompt_ratings_long <- d_ratings_long %>%
+  pivot_longer(
+    cols = c(type, hypo),
+    names_to = "Promptvariable",
+    values_to = "Bedingung"
+  ) %>%
+  mutate(
+    Promptbedingung = case_when(
+      Promptvariable == "type" ~ "Reflexionsanweisung",
+      Promptvariable == "hypo" ~ "Hypothesen"
+    ),
+    Promptbedingung = factor(
+      Promptbedingung,
+      levels = prompt_levels
+    ),
+    Bedingung = factor(
+      Bedingung,
+      levels = condition_levels
+    )
+  ) %>%
+  filter(!is.na(Bedingung))
+
 # Diese Tabelle betrachtet die Einzelbewertungen noch feiner:
 # getrennt nach
 # - Studienplanungsaspekt
