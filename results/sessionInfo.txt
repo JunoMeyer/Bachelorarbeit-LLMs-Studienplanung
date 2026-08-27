@@ -6,9 +6,8 @@ Matrix products: default
 
 
 locale:
-[1] LC_COLLATE=German_Germany.utf8  LC_CTYPE=German_Germany.utf8   
-[3] LC_MONETARY=German_Germany.utf8 LC_NUMERIC=C                   
-[5] LC_TIME=German_Germany.utf8    
+[1] LC_COLLATE=German_Germany.utf8  LC_CTYPE=German_Germany.utf8    LC_MONETARY=German_Germany.utf8
+[4] LC_NUMERIC=C                    LC_TIME=German_Germany.utf8    
 
 time zone: Europe/Berlin
 tzcode source: internal
@@ -20,8 +19,7 @@ other attached packages:
 [1] tibble_3.2.1 tidyr_1.3.1  dplyr_1.1.4  readxl_1.4.5
 
 loaded via a namespace (and not attached):
- [1] utf8_1.2.4       R6_2.5.1         tidyselect_1.2.1 cellranger_1.1.0
- [5] magrittr_2.0.3   glue_1.8.0       pkgconfig_2.0.3  generics_0.1.3  
- [9] lifecycle_1.0.5  cli_3.6.2        fansi_1.0.6      vctrs_0.6.5     
-[13] withr_3.0.2      renv_1.2.4       compiler_4.3.1   purrr_1.0.2     
-[17] tools_4.3.1      pillar_1.9.0     rlang_1.1.5     
+ [1] utf8_1.2.4       R6_2.5.1         tidyselect_1.2.1 cellranger_1.1.0 magrittr_2.0.3  
+ [6] glue_1.8.0       pkgconfig_2.0.3  generics_0.1.3   lifecycle_1.0.5  cli_3.6.2       
+[11] fansi_1.0.6      vctrs_0.6.5      withr_3.0.2      renv_1.2.4       compiler_4.3.1  
+[16] purrr_1.0.2      tools_4.3.1      pillar_1.9.0     rlang_1.1.5     
