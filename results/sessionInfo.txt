@@ -6,8 +6,9 @@ Matrix products: default
 
 
 locale:
-[1] LC_COLLATE=German_Germany.utf8  LC_CTYPE=German_Germany.utf8    LC_MONETARY=German_Germany.utf8
-[4] LC_NUMERIC=C                    LC_TIME=German_Germany.utf8    
+[1] LC_COLLATE=German_Germany.utf8  LC_CTYPE=German_Germany.utf8   
+[3] LC_MONETARY=German_Germany.utf8 LC_NUMERIC=C                   
+[5] LC_TIME=German_Germany.utf8    
 
 time zone: Europe/Berlin
 tzcode source: internal

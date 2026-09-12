@@ -366,7 +366,7 @@ F1_Deskriptiv_Gesamt <- d_scores %>%
 F1_Deskriptiv_Gesamt 
 
 ############################################################
-# 10. Forschungsfrage 2a:
+# 10. Forschungsfrage 2:
 # Gesamtqualität nach Promptbedingung
 ############################################################
 
@@ -407,7 +407,7 @@ d_prompt_scores_total <- d_scores %>%
   filter(!is.na(Bedingung))
 
 # Deskriptive Kennwerte der Gesamtqualität nach Promptbedingung
-F2a_Deskriptiv_Prompt_Gesamt <- d_prompt_scores_total %>%
+F2_Deskriptiv_Prompt_Gesamt <- d_prompt_scores_total %>%
   group_by(
     Promptbedingung,
     Bedingung
@@ -431,10 +431,10 @@ F2a_Deskriptiv_Prompt_Gesamt <- d_prompt_scores_total %>%
     Bedingung
   )
 
-F2a_Deskriptiv_Prompt_Gesamt 
+F2_Deskriptiv_Prompt_Gesamt 
 
 ############################################################
-# 12. Forschungsfrage 2b:
+# 12. Forschungsfrage 3:
 # Deskriptive Kennwerte je Studienplanungsaspekt und Promptbedingung
 ############################################################
 
@@ -478,7 +478,7 @@ d_aspect_scores_long <- d_scores %>%
   ) %>%
   filter(!is.na(Bedingung))
 
-F2b_Deskriptiv_Aspekt_Prompt <- d_aspect_scores_long %>%
+F3_Deskriptiv_Aspekt_Prompt <- d_aspect_scores_long %>%
   group_by(
     Aspekt,
     Promptbedingung,
@@ -507,13 +507,7 @@ F2b_Deskriptiv_Aspekt_Prompt <- d_aspect_scores_long %>%
     Bedingung
   )
 
-F2b_Deskriptiv_Aspekt_Prompt 
-
-############################################################
-# 14. Frage 2b: 
-# Deskriptive Kennwerte nach Promptbedingung,
-# Studienplanungsaspekt und Bewertungsdimension
-############################################################
+F3_Deskriptiv_Aspekt_Prompt 
 
 ############################################################
 # 13. Long-Format der Einzelbewertungen nach Promptbedingung
@@ -556,7 +550,7 @@ d_prompt_ratings_long <- d_ratings_long %>%
 # - Promptbedingung
 # - yes/no-Bedingung
 
-F2b_Deskriptiv_Aspekt_Prompt_Dimension <- d_prompt_ratings_long %>%
+F3_Deskriptiv_Aspekt_Prompt_Dimension <- d_prompt_ratings_long %>%
   group_by(
     Aspekt,
     Bewertungsdimension,
@@ -588,7 +582,7 @@ F2b_Deskriptiv_Aspekt_Prompt_Dimension <- d_prompt_ratings_long %>%
     Bedingung
   )
 
-F2b_Deskriptiv_Aspekt_Prompt_Dimension 
+F3_Deskriptiv_Aspekt_Prompt_Dimension 
 
 
 ############################################################
@@ -614,24 +608,24 @@ write.csv(
 
 
 write.csv(
-  F2a_Deskriptiv_Prompt_Gesamt,
-  file = file.path("results", "F2a_deskriptiv_prompt_gesamt.csv"),
+  F2_Deskriptiv_Prompt_Gesamt,
+  file = file.path("results", "F2_deskriptiv_prompt_gesamt.csv"),
   row.names = FALSE,
   fileEncoding = "UTF-8"
 )
 
 
 write.csv(
-  F2b_Deskriptiv_Aspekt_Prompt ,
-  file = file.path("results", "F2b_deskriptiv_aspekt_prompt.csv"),
+  F3_Deskriptiv_Aspekt_Prompt ,
+  file = file.path("results", "F3_deskriptiv_aspekt_prompt.csv"),
   row.names = FALSE,
   fileEncoding = "UTF-8"
 )
 
 
 write.csv(
-  F2b_Deskriptiv_Aspekt_Prompt_Dimension,
-  file = file.path("results", "F2b_deskriptiv_aspekt_prompt_dimension.csv"),
+  F3_Deskriptiv_Aspekt_Prompt_Dimension,
+  file = file.path("results", "F3_deskriptiv_aspekt_prompt_dimension.csv"),
   row.names = FALSE,
   fileEncoding = "UTF-8"
 )
@@ -642,9 +636,9 @@ saveRDS(
   list(
     tab_kodierungen_dimension = tab_kodierungen_dimension,
     F1_Deskriptiv_Gesamt = F1_Deskriptiv_Gesamt,
-    F2a_Deskriptiv_Prompt_Gesamt = F2a_Deskriptiv_Prompt_Gesamt,
-    F2b_Deskriptiv_Aspekt_Prompt  = F2b_Deskriptiv_Aspekt_Prompt,
-    F2b_Deskriptiv_Aspekt_Prompt_Dimension =  F2b_Deskriptiv_Aspekt_Prompt_Dimension
+    F2_Deskriptiv_Prompt_Gesamt = F2_Deskriptiv_Prompt_Gesamt,
+    F3_Deskriptiv_Aspekt_Prompt  = F3_Deskriptiv_Aspekt_Prompt,
+    F3_Deskriptiv_Aspekt_Prompt_Dimension =  F3_Deskriptiv_Aspekt_Prompt_Dimension
   ),
   file = file.path("results", "alle_ergebnistabellen.rds")
 )
