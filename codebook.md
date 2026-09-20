@@ -9,21 +9,21 @@
 - `hypo`: Hypothesen (Ausprägungen: `yes` = Hypothesen im Prompt, `no` = Hypothesen nicht im Prompt)
 - `prompt`: User-Prompt
 - `llm_output`: LLM-Output generiert von GPT-5.5
-- `Krit_Studiendesign_rating`: enspricht Bewertungsdimension 2 (Entscheidungshilfe in Bezug auf das Studiendesign)
-- `Krit_Messinstr_rating`: entspricht Bewertungsdimension 4 (Entscheidungshilfe in Bezug auf die Messinstrumente)
-- `Krit_Kontrollvar_rating`: entspricht Bewertungsdimension 6 (Entscheidungshilfe in Bezug auf Kontrollvariablen)
+- `Krit_Studiendesign_rating`: enspricht Bewertungsskala 2 (Entscheidungshilfe in Bezug auf das Studiendesign)
+- `Krit_Messinstr_rating`: entspricht Bewertungsskala 4 (Entscheidungshilfe in Bezug auf die Messinstrumente)
+- `Krit_Kontrollvar_rating`: entspricht Bewertungsskala 6 (Entscheidungshilfe in Bezug auf Kontrollvariablen)
 - `Kritische Reflexion Begründung`: Begründungen für die Kodierung von Bewertungsdimension 2, 4 & 6
-- `Studiendesign_Rating`: entspricht Bewertungsdimension 1 (Angemessenheit des vorgeschlagenen Studiendesign)
+- `Studiendesign_Rating`: entspricht Bewertungsskala 1 (Angemessenheit des vorgeschlagenen Studiendesign)
 - `Studiendesign_Begründung`: Begründung der Kodierung von Bewertungsdimension 1
-- `Messinstrumente_Rating`: enstpricht Bewertungsdimension 3 (Angemessenheit der vorgeschlagenen Messinstrumente)
-- `Messinstrumente_Begründung`: Begründung der Kodierung von Bewertungsdimension 3
-- `Kontrollvariablen_Rating`: enstpricht Bewertungsdimension 5 (Angemessenheit der vorgeschlagenen Kontrollvariablen)
-- `Kontrollvariablen_Begründung`: Begründung der Kodierung von Bewertungsdimension 5
+- `Messinstrumente_Rating`: enstpricht Bewertungsskala 3 (Angemessenheit der vorgeschlagenen Messinstrumente)
+- `Messinstrumente_Begründung`: Begründung der Kodierung von Bewertungsskala 3
+- `Kontrollvariablen_Rating`: enstpricht Bewertungsskala 5 (Angemessenheit der vorgeschlagenen Kontrollvariablen)
+- `Kontrollvariablen_Begründung`: Begründung der Kodierung von Bewertungsskala 5
   
 
 ## Kodierungen 
 
-- 1: LLM-Output als "sehr schlecht" bewertet
-- 2: LLM-Output als "mittelmäßig" bewertet
-- 3: LLM-Output als "sehr gut" bewertet
+- 1: LLM-Output als "schlecht" bewertet
+- 2: LLM-Output als "mittel" bewertet
+- 3: LLM-Output als "gut" bewertet
 
