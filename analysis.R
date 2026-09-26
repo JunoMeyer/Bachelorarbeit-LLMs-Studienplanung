@@ -1,7 +1,7 @@
 ############################################################
 # Bachelorarbeit – Analyse der LLM-Outputs
 # Autorin: Juno Meyer
-# Datum: 10.08.2026
+# Datum: 28.09.2026
 # Hinweis: dieses Skript wurde mit GPT-5.5 erstellt und durch die Autorin geprüft
 #
 # Zweck des Skripts:
